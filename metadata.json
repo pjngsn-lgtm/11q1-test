@@ -1,0 +1,8 @@
+{
+  "name": "[ LLU.R MUSiC iGHT ]",
+  "description": "Local music player and keyframe motion studio combining Musicolet multi-queue playback, embedded lyrics, and Alight Motion layer animation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
