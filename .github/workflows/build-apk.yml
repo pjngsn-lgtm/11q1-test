@@ -1,0 +1,103 @@
+name: Build Offline Android APK
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies and build web bundle
+        run: |
+          npm install
+          npm run build
+
+      - name: Install Capacitor and create Android project
+        run: |
+          npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+          npx cap add android
+
+      - name: Configure Android permissions and launcher icons
+        run: |
+          python3 - <<'PY'
+          import shutil, pathlib
+
+          manifest_path = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest_path.read_text(encoding="utf-8")
+          perms = [
+              '<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />',
+              '<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />',
+              '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+              '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
+          ]
+          insert_block = "\n    ".join(p for p in perms if p not in text)
+          if insert_block:
+              text = text.replace("<application", f"    {insert_block}\n\n    <application", 1)
+          manifest_path.write_text(text, encoding="utf-8")
+
+          res_dir = pathlib.Path("android/app/src/main/res")
+          anydpi = res_dir / "mipmap-anydpi-v26"
+          if anydpi.exists():
+              shutil.rmtree(anydpi)
+
+          src_512 = pathlib.Path("public/pwa-512x512.png")
+          src_192 = pathlib.Path("public/pwa-192x192.png")
+          for mipmap in res_dir.glob("mipmap-*"):
+              if not mipmap.is_dir():
+                  continue
+              for old_icon in mipmap.glob("ic_launcher*"):
+                  old_icon.unlink()
+              src = src_192 if any(k in mipmap.name for k in ("mdpi", "hdpi")) else src_512
+              shutil.copyfile(src, mipmap / "ic_launcher.png")
+              shutil.copyfile(src, mipmap / "ic_launcher_round.png")
+          PY
+
+      - name: Sync offline web assets into Android APK
+        run: npx cap sync android
+
+      - name: Build offline Android APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK output
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk PUR-MusicLight-offline.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUR-MusicLight-offline-apk
+          path: PUR-MusicLight-offline.apk
+          retention-days: 30
+
+      - name: Publish direct APK to GitHub Releases
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="apk-v${{ github.run_number }}"
+          gh release create "$TAG" PUR-MusicLight-offline.apk \
+            --title "[ P.U.R MUSiCLiGHT ] Offline APK #${{ github.run_number }}" \
+            --notes "100% self-contained offline Android APK (no internet required)." \
+            --latest

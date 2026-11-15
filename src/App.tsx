@@ -365,6 +365,15 @@ export default function App() {
       }
     }
 
+    const isAndroidOrCapacitor =
+      typeof navigator !== 'undefined' &&
+      (/Android/i.test(navigator.userAgent) || 'Capacitor' in window);
+
+    if (isAndroidOrCapacitor && fileInputRef.current) {
+      fileInputRef.current.click();
+      return;
+    }
+
     folderInputRef.current?.click();
   }, [tracks, appendNewTracksToQueue, showNotice]);
 

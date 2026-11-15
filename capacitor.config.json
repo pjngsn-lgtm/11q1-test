@@ -1,0 +1,8 @@
+{
+  "appId": "com.pur.musiclight",
+  "appName": "PUR MusicLight",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  }
+}

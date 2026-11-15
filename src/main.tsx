@@ -3,6 +3,8 @@ import {registerSW} from 'virtual:pwa-register';
 import App from './App.tsx';
 import './index.css';
 
-registerSW({immediate: true});
+if (typeof window !== 'undefined' && !('Capacitor' in window)) {
+  registerSW({immediate: true});
+}
 
 createRoot(document.getElementById('root')!).render(<App />);
